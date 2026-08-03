@@ -1,28 +1,75 @@
 # Case study 1 — AI catalog findability
 
-**Domain:** B2B wholesale ops (catalog + purchasing/sales invoices)  
+**Domain:** B2B wholesale ops (purchase & sales invoices ↔ catalog)  
 **Role:** Product / systems design + AI resolution pipeline  
-**Status:** Production pattern (details sanitized)
+**One-liner:** Clerks stopped retyping and hunting SKUs line-by-line — they now confirm exceptions while the system matches the rest.
 
 ---
 
-## Problem
+## Before → After (clerk day)
 
-Incoming invoice lines and billing ledgers rarely match clean catalog SKUs 1:1.
+### Before — “Type, search, hope”
 
-Clerks see messy strings — pack sizes, shorthand, brand aliases, OCR noise — while the business needs every sold or purchased line to land on a **real catalog variant**. Wrong matches break stock, pricing, and reporting.
+A supplier PDF or sales bill lands. For **every line**, a clerk typically:
 
-The failure mode to avoid: treating “shares a generic ledger” as unfinished, or sending every line to an LLM when local aliases already know the answer.
+1. Reads a messy billing string (“Brand X primer 10ml”, OCR garbage, pack shorthand)
+2. Opens the catalog / stock list and **searches by memory**
+3. Picks something that *looks* right — or invents a free-text description
+4. Moves on; wrong size / pack / variant only shows up later in stock or customer complaints
+5. Repeats for 20–80 lines per bill
+
+**Pain:** slow, dependent on tribal knowledge, inconsistent names, no reliable link from “what was billed” to “what we stock.”
+
+### After — “Upload → auto-match → confirm the red rows”
+
+1. Clerk uploads / pastes the bill (or OCR extract)
+2. System resolves each line **local-first** (exact aliases → ledger aliases → rules/fuzzy)
+3. Table lights up: green **MATCHED**, amber **SUGGEST**, red **UNMATCHED / NEW**
+4. Clerk only works the amber/red rows — accept suggestion, pick attributes, or create variant
+5. Save writes a **durable variant link** (and aliases learn from confirmed wires)
+
+**Gain:** most lines never need a human search; AI/LLM only helps when local matchers fail; stock and reporting inherit stable IDs.
+
+```mermaid
+flowchart LR
+  subgraph before [Before]
+    B1[Read line] --> B2[Manual search]
+    B2 --> B3[Guess / free-text]
+    B3 --> B4[Next line…]
+  end
+  subgraph after [After]
+    A1[Extract lines] --> A2[Auto-resolve cascade]
+    A2 --> A3{Confidence?}
+    A3 -->|high| A4[Matched — skip]
+    A3 -->|low| A5[Clerk confirms]
+    A4 --> A6[Save + stock link]
+    A5 --> A6
+  end
+```
 
 ---
 
-## Constraints
+## Concrete before / after on one line (synthetic)
 
-- High volume of historical strings; accuracy matters more than novelty
-- Many catalog variants may map to one billing ledger (many → one is valid)
-- LLM spend and latency must stay bounded
-- Human confirmation stays in the loop for ambiguous or new items
-- No customer invoices or proprietary catalogs in public materials
+| | Before | After |
+| --- | --- | --- |
+| **What clerk sees** | `ORMCO ORTHO SOLO PRIM 10CC` on a PDF | Same string in a resolve table |
+| **What clerk does** | Search “ortho”, “solo”, “primer”… pick from memory | Status already **MATCHED** → Orthodontic Primer 10cc |
+| **If unknown pack** | Guess or leave as free text | **SUGGEST** with size/pack dropdowns; one tap to confirm |
+| **What gets saved** | Ambiguous description | Variant ID + billing name + notes |
+| **Next time same string** | Search again | Instant exact/alias hit — no model call |
+
+---
+
+## Problem (why this mattered)
+
+Incoming invoice lines rarely match clean catalog SKUs 1:1. Pack sizes, shorthand, brand aliases, and OCR noise break stock, pricing, and sold metrics unless every line lands on a **real variant**.
+
+Failure modes we designed against:
+
+- Sending **every** line to an LLM when aliases already know the answer
+- Treating “shares a generic ledger” as unfinished when many→one wiring is valid
+- Pretty catalog cards that still aren’t **invoice-findable**
 
 ---
 
@@ -51,12 +98,10 @@ flowchart TD
 
 **Design choices**
 
-1. **Wire findability on the variant** — durable alias lists on the catalog side, not one-off prompt memory.
-2. **Resolve must prefer local exact/alias hits** — already-wired lines never need a model round-trip.
-3. **Status vocabulary for ops** — `MATCHED` / `SUGGEST_VARIANT` / `UNMATCHED` / `NEW_ITEM` so the UI is an exception queue, not a chat transcript.
-4. **Family-scoped enrichment** — when a family is thin on structure, use richer historical clerk notes as variant signals before inventing a Cartesian matrix.
-
-### What “wired” means (audit tiers)
+1. **Wire findability on the variant** — durable alias lists, not one-off prompt memory
+2. **Already-wired lines never call the model**
+3. **Ops status vocabulary** — MATCHED / SUGGEST / UNMATCHED / NEW so the UI is an exception queue
+4. **Audit tiers** keep the team honest about coverage
 
 | Tier | Meaning |
 | --- | --- |
@@ -64,59 +109,39 @@ flowchart TD
 | Findability only | Tallies present but none hit live stock items |
 | Unwired | No assigned billing strings yet |
 
-This keeps the team honest: a pretty catalog card without invoice findability is not done.
-
 ---
 
-## Analytics that mattered
+## Impact (illustrative / synthetic)
 
-Illustrative metrics (synthetic magnitudes for portfolio; production numbers stay private):
-
-| Metric | Why it matters |
-| --- | --- |
-| Line match rate (exact/alias vs model vs miss) | Proves local-first is carrying the load |
-| Clerk confirm time on suggestions | Measures whether AI proposals are useful |
-| False-match escapes | Catches dangerous “confident but wrong” paths |
-| Family coverage by audit tier | Prioritizes cleanup work |
+| Metric | Before (typical) | After (target shape) |
+| --- | --- | --- |
+| Clerk time per bill | Hunt every line | Touch ~10–20% exception rows |
+| Resolve mix | 100% human judgment | ~70%+ exact/alias, rest rules + rare LLM suggest |
+| Repeat of same string | Search again | Instant match |
+| Downstream stock link | Often missing / wrong | Default on save |
 
 ```mermaid
-pie title Illustrative resolve mix (synthetic)
-  "Exact / alias" : 72
-  "Rules / fuzzy" : 14
-  "LLM-assisted suggest" : 9
-  "Unmatched / new" : 5
+pie title Illustrative resolve mix after wiring (synthetic)
+  "Exact / alias — no clerk work" : 72
+  "Rules / fuzzy — auto" : 14
+  "LLM-assisted suggest — clerk taps" : 9
+  "Unmatched / new — clerk creates" : 5
 ```
-
----
-
-## Outcome
-
-- Clerks spend time on **exceptions**, not retyping known aliases
-- Catalog work is dual-goal: rich product attributes **and** invoice findability
-- AI cost stays proportional to ambiguity, not to total line volume
-- Stock and sales systems inherit stable variant IDs instead of free-text drift
 
 ---
 
 ## What I’d improve next
 
 - Offline eval sets of anonymized billing strings with gold variant IDs
-- Per-family budgets and automatic “stop calling the model” once local hit rate clears a threshold
-- Stronger pack÷N / buy-vs-sell guards surfaced as first-class resolve reasons
+- Per-family “stop calling the model” once local hit rate clears a threshold
+- Stronger pack÷N / buy-vs-sell guards as first-class resolve reasons
 
 ---
 
 ## Screenshots (placeholders)
 
-> Replace with blurred UI / synthetic data before sharing widely.
-
 | Asset | Intent |
 | --- | --- |
-| `assets/01-resolve-table.png` | Resolve table with status badges (MATCHED / SUGGEST) |
-| `assets/01-audit-tiers.png` | Family audit summary by wired tier |
-
-```text
-assets/
-  01-resolve-table.png   # TODO: blurred clerk UI
-  01-audit-tiers.png     # TODO: synthetic chart or redacted dashboard
-```
+| `assets/01-before-manual-search.png` | Blurred old flow: search box + tribal pick |
+| `assets/01-after-resolve-table.png` | Status badges — green majority, amber/red exceptions |
+| `assets/01-audit-tiers.png` | Family coverage by wired tier |

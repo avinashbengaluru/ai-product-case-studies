@@ -1,11 +1,16 @@
 # Assets
 
-Drop blurred screenshots and synthetic diagrams here. Filenames referenced from the case studies:
+Blurred / synthetic screenshots. Prefer **before + after** pairs.
 
-- `01-resolve-table.png`
-- `01-audit-tiers.png`
-- `02-scan-preview.png`
-- `02-draft-invoice.png`
-- `02-lot-drawdown.png`
+### Case study 1
+- `01-before-manual-search.png` — old hunt/search flow
+- `01-after-resolve-table.png` — status badges, exception rows only
+- `01-audit-tiers.png` — wired-tier coverage
 
-**Rules:** no real customer names, phone numbers, invoice totals from production, API keys, or readable proprietary catalog dumps.
+### Case study 2
+- `02-before-desk-entry.png` — desktop retyping
+- `02-after-scan-preview.png` — phone scan preview
+- `02-draft-invoice.png` — draft invoice (redacted)
+- `02-lot-drawdown.png` — lot remaining after process
+
+**Rules:** no real customer names, phones, production totals, API keys, or proprietary catalog dumps.

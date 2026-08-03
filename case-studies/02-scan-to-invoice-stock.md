@@ -1,29 +1,73 @@
-# Case study 2 — Scan → invoice → stock analytics
+# Case study 2 — Scan → invoice → stock
 
-**Domain:** Mobile sales ops + inventory lots  
-**Role:** Full-stack product (Flutter client, API, stock consumption design)  
-**Status:** Production pattern (details sanitized)
-
----
-
-## Problem
-
-Wholesale sales often start at the shelf: a clerk scans a printed stock label, needs a correct invoice line, then must draw down the **right variant’s batches** (preferably FEFO) when the invoice is processed.
-
-If scan, billing name, and lot consumption disagree, you get:
-
-- invoices that don’t match what left the shelf
-- stock counts that drift from physical
-- no trustworthy sold metrics on variants
+**Domain:** Mobile sales ops + batch/lot inventory  
+**Role:** Full-stack product (Flutter, APIs, FEFO consumption)  
+**One-liner:** Clerks stopped writing invoices from memory at the desk — they scan the shelf, and processing draws down the right lots.
 
 ---
 
-## Constraints
+## Before → After (clerk day)
 
-- Labels must stay short (QR token), not dump full product payloads
-- Draft invoices need fast add/edit on phone; process is a deliberate commit
-- Batch selection defaults to FEFO but allows clerk override
-- Public materials use fake QR payloads and blurred UI only
+### Before — “Walk the shelf, then rebuild the bill at the desk”
+
+Typical sales day:
+
+1. Clerk walks the warehouse / counter with a mental list or paper note
+2. Remembers (or misremembers) product names, sizes, packs
+3. Sits at a desktop invoice screen and **retypes** every line
+4. Batch / expiry is free text, guessed from purchase history, or skipped
+5. Stock is updated later — or never tied to the exact lot that left the shelf
+6. Disputes: “We billed X but picked Y” / “System says 12, shelf has 7”
+
+**Pain:** double work, name drift, weak FEFO, stock that doesn’t match physical.
+
+### After — “Scan on the floor → draft on phone → process commits stock”
+
+1. Clerk scans the **printed stock label** on the unit
+2. Phone shows the correct variant + billing name (server lookup from a short QR token)
+3. One tap adds the line to a **draft sales invoice** (customer already chosen)
+4. Repeat scans until the order is complete; edit qty on device
+5. **Process** is the commit: system consumes lots FEFO (or clerk-chosen batch), updates remaining qty, records sold metrics
+
+**Gain:** the shelf is the source of truth; the desk is for exceptions and payment — not re-entry.
+
+```mermaid
+flowchart TB
+  subgraph before [Before]
+    P1[Pick from shelf] --> P2[Paper / memory]
+    P2 --> P3[Retype invoice at desk]
+    P3 --> P4[Guess batch or skip]
+    P4 --> P5[Stock drifts]
+  end
+  subgraph after [After]
+    Q1[Scan label] --> Q2[Auto line on draft]
+    Q2 --> Q3[More scans…]
+    Q3 --> Q4[Process invoice]
+    Q4 --> Q5[FEFO lot drawdown]
+  end
+```
+
+---
+
+## Concrete before / after on one sale (synthetic)
+
+| Step | Before | After |
+| --- | --- | --- |
+| **Identify product** | Read box, remember Tally name | Scan `demo:abc123~4` → preview “Orthodontic Primer 10cc” |
+| **Add to invoice** | Type name at PC; risk wrong pack | Tap **Add to draft** on phone |
+| **Choose batch** | Free text or ignore expiry | Default soonest expiry; override if needed |
+| **Finish job** | Save invoice; stock “maybe later” | Process → remaining lots drop in the stock panel |
+| **Prove it** | Argue from memory | Lot shows `remaining / original`; sold metrics on variant |
+
+---
+
+## Problem (why this mattered)
+
+If scan, billing name, and lot consumption disagree:
+
+- Invoices don’t match what left the shelf
+- Stock counts drift from physical
+- Sold analytics can’t trust free-text descriptions
 
 ---
 
@@ -44,103 +88,65 @@ sequenceDiagram
   Clerk->>Mobile: Add line to draft invoice
   Clerk->>Mobile: Process invoice
   Mobile->>API: Process
-  API->>Stock: Consume qty FEFO (or preferred batch)
+  API->>Stock: Consume qty FEFO or preferred batch
   Stock-->>API: Remaining lots updated
   API-->>Mobile: Processed + stock result
 ```
 
-### Label design
+### Label + line mapping
 
-Printed stickers encode a **short opaque token** (print run + sequence). Full product resolution lives server-side. The phone sends the raw scan string; the API returns the catalog variant, Tally-facing description, and clerk-facing notes.
+Printed stickers use a **short opaque token**; product data lives server-side.
 
-Illustrative (fake) token shape:
-
-```text
-demo:{printRunId}~{sequence}
-```
-
-### Invoice line mapping (concept)
-
-| What the clerk sees | What the system stores |
+| Clerk-facing | System-facing |
 | --- | --- |
-| Billing / ledger line name | Canonical sell string for downstream accounting |
-| Variant detail / notes | Human-readable SKU context |
-| Hidden links | Variant + family IDs for stock |
+| Billing / ledger line name | String accounting systems expect |
+| Variant detail / notes | Human SKU context |
+| Hidden IDs | Variant + family keys for stock |
 
-### Stock consumption
+### When inventory moves
 
-On process (not on every draft edit):
+Draft edits do **not** consume stock. **Process** does:
 
-1. Resolve each line to `variantStockId`
-2. Prefer clerk-chosen batch when present; otherwise FEFO by expiry
-3. Decrement `remainingQuantity` on lots; refresh denormalized stock summaries
-4. Record sale metrics on the variant for analytics
-
-```mermaid
-flowchart LR
-  I[Processed invoice lines] --> C{Preferred batch?}
-  C -->|yes| L1[Consume that lot]
-  C -->|no| L2[Sort lots by expiry]
-  L2 --> L3[FEFO drawdown]
-  L1 --> S[Update remaining + summaries]
-  L3 --> S
-  S --> A[Sold qty / amount metrics]
-```
+1. Each line → `variantStockId`
+2. Preferred batch if clerk overrode; else FEFO by expiry
+3. Decrement lot `remainingQuantity`; refresh summaries
+4. Attach sold qty/amount to the variant for analytics
 
 ---
 
-## Analytics that mattered
+## Impact (illustrative / synthetic)
 
-| Metric | Question it answers |
-| --- | --- |
-| Scan → line success rate | Are labels and lookup healthy? |
-| Process failures (over-sell, missing lots) | Where does physical stock disagree with system? |
-| FEFO override rate | Are clerks fighting the default — and why? |
-| Time from first scan to processed invoice | Is mobile actually faster than desk entry? |
-| Variant sold qty vs lot drawdown | Did accounting and inventory stay in sync? |
-
-Illustrative dashboard narrative (synthetic):
+| Metric | Before | After (target shape) |
+| --- | --- | --- |
+| Path to invoice line | Memory + keyboard | Scan → confirm |
+| Median time shelf → billed | Long (two-pass) | Single-pass on phone (~few minutes) |
+| Batch / expiry discipline | Optional / guessed | Default FEFO on process |
+| Stock after sale | Often stale | Lot remaining updates with the invoice |
+| “Wrong item billed” disputes | Common | Traceable: label → variant → lot |
 
 ```text
-Weekly ops (demo numbers)
-- Scans resolved: 98.2%
-- Invoices processed without stock exception: 94%
-- Median scan→process: 3.4 min
-- FEFO overrides: 11% (mostly near-expiry promotions)
+Weekly ops narrative (demo numbers)
+- Scans resolved: ~98%
+- Processes with no stock exception: ~94%
+- Median first-scan → process: ~3–4 min
+- FEFO overrides: ~10% (promos / customer-requested batch)
 ```
-
----
-
-## Outcome
-
-- Shelf action becomes the source of truth for the draft line
-- Processing is the hard boundary where inventory moves
-- Stock UI can show remaining / original per lot — clerks can verify drawdown visually
-- Analytics attach to catalog variants, not orphan free-text descriptions
 
 ---
 
 ## What I’d improve next
 
-- Auth-hardened scan APIs for anything beyond LAN/internal use
-- Split-across-lots UX when qty exceeds a single batch
-- Lightweight offline queue for scans in poor connectivity, with conflict review on sync
+- Auth-hardened scan APIs beyond LAN/internal use
+- Clear UX when qty must split across multiple lots
+- Offline scan queue + conflict review when connectivity drops
 
 ---
 
 ## Screenshots (placeholders)
 
-> Replace with blurred UI / synthetic data before sharing widely.
-
 | Asset | Intent |
 | --- | --- |
-| `assets/02-scan-preview.png` | Phone scan preview with fake product |
-| `assets/02-draft-invoice.png` | Draft invoice lines (redacted customer) |
-| `assets/02-lot-drawdown.png` | Stock lot panel after process |
-
-```text
-assets/
-  02-scan-preview.png    # TODO: blurred Flutter UI
-  02-draft-invoice.png   # TODO: synthetic customer / amounts
-  02-lot-drawdown.png    # TODO: remaining/quantity lots view
-```
+| `assets/02-before-desk-entry.png` | Blurred desktop retyping flow |
+| `assets/02-after-scan-preview.png` | Phone scan preview (fake product) |
+| `assets/02-draft-invoice.png` | Draft lines — redacted customer |
+| `assets/02-lot-drawdown.png` | Lots panel: remaining / original after process |

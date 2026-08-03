@@ -14,14 +14,14 @@ I design end-to-end tools where messy real-world data (invoices, stickers, billi
 | **Analytics** | Match rates, stock drawdown integrity, exception queues, operational cycle time |
 | **Product engineering** | Mobile + web ops apps, APIs, inventory lots (FEFO), invoice processing |
 
-Private production systems stay private. This repo is the **public case-study layer**: problem framing, architecture, measurement, and outcomes — no secrets, no customer data, no proprietary catalogs.
+Private production systems stay private. This repo is the **public case-study layer**: clerk before/after, architecture, and impact — no secrets, no customer data, no proprietary catalogs.
 
 ---
 
 ## Case studies
 
-1. **[AI catalog findability](./case-studies/01-ai-catalog-findability.md)** — Turning inconsistent invoice / Tally billing strings into high-confidence catalog variant matches with a local-first cascade and measured LLM assist.
-2. **[Scan → invoice → stock analytics](./case-studies/02-scan-to-invoice-stock.md)** — Mobile QR scan into draft sales invoices, FEFO lot consumption on process, and the metrics that prove the loop works.
+1. **[AI catalog findability](./case-studies/01-ai-catalog-findability.md)** — **Before:** hunt & retype every invoice line. **After:** auto-match most lines; clerks only confirm exceptions.
+2. **[Scan → invoice → stock](./case-studies/02-scan-to-invoice-stock.md)** — **Before:** pick from shelf, rebuild the bill at the desk. **After:** scan on the floor; process draws down the right lots (FEFO).
 
 ---
 
