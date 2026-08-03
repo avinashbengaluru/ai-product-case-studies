@@ -20,7 +20,7 @@ Private production systems stay private. This repo is the **public case-study la
 
 ## Case studies
 
-1. **[AI catalog findability](./case-studies/01-ai-catalog-findability.md)** — **Before:** hunt & retype every invoice line. **After:** auto-match most lines; clerks only confirm exceptions.
+1. **[Smart Invoice Matching](./case-studies/01-smart-invoice-matching.md)** — **Before:** hunt & retype every invoice line. **After:** auto-match most lines; clerks only confirm exceptions.
 2. **[Scan → invoice → stock](./case-studies/02-scan-to-invoice-stock.md)** — **Problem:** no external POS, and carton scans bill the wrong grain. **After:** phone camera scans the **product** label; process draws down FEFO lots.
 
 ---

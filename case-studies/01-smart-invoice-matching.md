@@ -1,8 +1,8 @@
-# Case study 1 — AI catalog findability
+# Case study 1 — Smart Invoice Matching
 
 **Domain:** B2B wholesale ops (purchase & sales invoices ↔ catalog)  
 **Role:** Product / systems design + AI resolution pipeline  
-**One-liner:** Clerks stopped retyping and hunting SKUs line-by-line — they now confirm exceptions while the system matches the rest.
+**One-liner:** Turn messy invoice lines into matched catalog products automatically — clerks only review exceptions, not every SKU.
 
 ---
 
@@ -69,7 +69,7 @@ Failure modes we designed against:
 
 - Sending **every** line to an LLM when aliases already know the answer
 - Treating “shares a generic ledger” as unfinished when many→one wiring is valid
-- Pretty catalog cards that still aren’t **invoice-findable**
+- Pretty catalog cards that still don’t **match from a real invoice line**
 
 ---
 
@@ -98,16 +98,16 @@ flowchart TD
 
 **Design choices**
 
-1. **Wire findability on the variant** — durable alias lists, not one-off prompt memory
-2. **Already-wired lines never call the model**
+1. **Store match aliases on the variant** — durable billing strings, not one-off prompt memory
+2. **Already-matched lines never call the model**
 3. **Ops status vocabulary** — MATCHED / SUGGEST / UNMATCHED / NEW so the UI is an exception queue
-4. **Audit tiers** keep the team honest about coverage
+4. **Coverage tiers** keep the team honest about what’s actually match-ready
 
 | Tier | Meaning |
 | --- | --- |
-| Confirmed wired | ≥1 billing string resolves to a real stock ledger name or alias |
-| Findability only | Tallies present but none hit live stock items |
-| Unwired | No assigned billing strings yet |
+| Match-ready | ≥1 billing string resolves to a real stock ledger name or alias |
+| Alias-only | Strings present but none hit live stock items |
+| Unmatched catalog | No assigned billing strings yet |
 
 ---
 
@@ -121,7 +121,7 @@ flowchart TD
 | Downstream stock link | Often missing / wrong | Default on save |
 
 ```mermaid
-pie title Illustrative resolve mix after wiring (synthetic)
+pie title Illustrative resolve mix after Smart Invoice Matching (synthetic)
   "Exact / alias — no clerk work" : 72
   "Rules / fuzzy — auto" : 14
   "LLM-assisted suggest — clerk taps" : 9
@@ -144,4 +144,4 @@ pie title Illustrative resolve mix after wiring (synthetic)
 | --- | --- |
 | `assets/01-before-manual-search.png` | Blurred old flow: search box + tribal pick |
 | `assets/01-after-resolve-table.png` | Status badges — green majority, amber/red exceptions |
-| `assets/01-audit-tiers.png` | Family coverage by wired tier |
+| `assets/01-audit-tiers.png` | Family coverage by match-ready tier |
