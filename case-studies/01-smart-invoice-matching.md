@@ -8,7 +8,11 @@
 
 ## Before → After (clerk day)
 
+![Before: hunt every line · After: auto-match with exception review](../assets/01-before-after-matching.png)
+
 ### Before — “Type, search, hope”
+
+![Clerk manually searching the catalog for each invoice line](../assets/01-before-manual-search.png)
 
 A supplier PDF or sales bill lands. For **every line**, a clerk typically:
 
@@ -22,11 +26,13 @@ A supplier PDF or sales bill lands. For **every line**, a clerk typically:
 
 ### After — “Upload → auto-match → confirm the red rows”
 
+![Resolve table: most lines MATCHED, clerk only touches exceptions](../assets/01-after-resolve-table.png)
+
 1. Clerk uploads / pastes the bill (or OCR extract)
 2. System resolves each line **local-first** (exact aliases → ledger aliases → rules/fuzzy)
 3. Table lights up: green **MATCHED**, amber **SUGGEST**, red **UNMATCHED / NEW**
 4. Clerk only works the amber/red rows — accept suggestion, pick attributes, or create variant
-5. Save writes a **durable variant link** (and aliases learn from confirmed wires)
+5. Save writes a **durable variant link** (and aliases learn from confirmed matches)
 
 **Gain:** most lines never need a human search; AI/LLM only helps when local matchers fail; stock and reporting inherit stable IDs.
 
@@ -68,7 +74,7 @@ Incoming invoice lines rarely match clean catalog SKUs 1:1. Pack sizes, shorthan
 Failure modes we designed against:
 
 - Sending **every** line to an LLM when aliases already know the answer
-- Treating “shares a generic ledger” as unfinished when many→one wiring is valid
+- Treating “shares a generic ledger” as unfinished when many→one matching is valid
 - Pretty catalog cards that still don’t **match from a real invoice line**
 
 ---
@@ -109,6 +115,8 @@ flowchart TD
 | Alias-only | Strings present but none hit live stock items |
 | Unmatched catalog | No assigned billing strings yet |
 
+![Catalog match coverage by tier — synthetic demo](../assets/01-audit-tiers.png)
+
 ---
 
 ## Impact (illustrative / synthetic)
@@ -138,10 +146,6 @@ pie title Illustrative resolve mix after Smart Invoice Matching (synthetic)
 
 ---
 
-## Screenshots (placeholders)
+## Image notes
 
-| Asset | Intent |
-| --- | --- |
-| `assets/01-before-manual-search.png` | Blurred old flow: search box + tribal pick |
-| `assets/01-after-resolve-table.png` | Status badges — green majority, amber/red exceptions |
-| `assets/01-audit-tiers.png` | Family coverage by match-ready tier |
+Synthetic mockups for the public portfolio (fake product names, demo coverage %). They show the clerk before/after for **Smart Invoice Matching** — not production screenshots.
