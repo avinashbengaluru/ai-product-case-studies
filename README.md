@@ -1,8 +1,22 @@
 # Avinash Bengaluru
 
-**Product engineer building AI-assisted operations systems and decision analytics.**
+**Product engineer building AI-native operations apps and decision analytics.**
 
-I design end-to-end tools where messy real-world data (invoices, stickers, billing strings) becomes reliable catalog matches, stock movements, and clerk-ready workflows — with AI used as a controlled last mile, not a black box.
+I ship full-stack products where AI is not a demo chat window — it runs through **document understanding, catalog construction, invoice matching, and clerk exception queues**. Private production systems stay private; this repo is the public writeup layer.
+
+---
+
+## Where AI actually shows up
+
+| Layer | What AI does | What stays deterministic |
+| --- | --- | --- |
+| **Document intake** | Vision OCR + LLM turns PDF/image invoices into structured line items (qty, batch, expiry, descriptions) | Schema validation, clerk edit table |
+| **Catalog building** | LLMs design variant matrices from messy billing strings + manufacturer docs; map strings onto real SKUs without Cartesian explosion | Stock ledger gates, pack rules, human publish |
+| **Research assist** | Web/doc retrieval + Vision OCR on price lists/IFUs → structured catalog specs | Source citations, clerk acceptance |
+| **Invoice matching** | LLM proposes variants only when local aliases/rules miss | Exact/alias/fuzzy first; confirm before write |
+| **Ops UX** | Statused suggestions (`MATCHED` / `SUGGEST` / `NEW`) so AI is an exception queue | Durable IDs, FEFO stock, mobile scan |
+
+**Principle:** spend model budget on ambiguity. Already-known billing strings and product-label scans should not call a model.
 
 ---
 
@@ -10,33 +24,32 @@ I design end-to-end tools where messy real-world data (invoices, stickers, billi
 
 | Pillar | Focus |
 | --- | --- |
-| **AI systems** | Local-first resolution cascades, LLM fallbacks with human confirm, OCR → structured extract |
-| **Analytics** | Match rates, stock drawdown integrity, exception queues, operational cycle time |
-| **Product engineering** | Mobile + web ops apps, APIs, inventory lots (FEFO), invoice processing |
-
-Private production systems stay private. This repo is the **public case-study layer**: clerk before/after, architecture, and impact — no secrets, no customer data, no proprietary catalogs.
+| **AI systems** | Multi-step LLM pipelines, OCR→JSON extract, catalog architect + mapper flows, measured fallbacks |
+| **Analytics** | Match rates, model-vs-local mix, stock drawdown integrity, cycle time |
+| **Product engineering** | Flutter + Next.js ops apps, APIs, inventory lots (FEFO), invoice processing |
 
 ---
 
-## Case studies
+## Selected product builds
 
-1. **[Smart Invoice Matching](./case-studies/01-smart-invoice-matching.md)** — **Before:** hunt & retype every invoice line. **After:** auto-match most lines; clerks only confirm exceptions.
-2. **[Scan → invoice → stock](./case-studies/02-scan-to-invoice-stock.md)** — **Problem:** no external POS, and carton scans bill the wrong grain. **After:** phone camera scans the **product** label; process draws down FEFO lots.
+1. **[Smart Invoice Matching](./case-studies/01-smart-invoice-matching.md)** — OCR + LLM extract, local-first resolve, AI suggestions on misses, AI-assisted catalog that makes matching possible.
+2. **[Scan → invoice → stock](./case-studies/02-scan-to-invoice-stock.md)** — Phone-only sales capture (no external POS); product-label scan → draft → FEFO. Powered by the same AI-built catalog + match graph.
 
 ---
 
 ## How I use AI (working principles)
 
-- **Rules and indexes first.** Exact aliases and deterministic matchers own the easy majority.
-- **Models for ambiguity.** LLMs propose structured candidates; clerks confirm before durable writes.
-- **Measure the system.** Hit rate, suggestion quality, and time-to-confirm beat demo screenshots.
-- **No secret prompts as portfolio.** Patterns and diagrams ship publicly; production prompts, keys, and datasets do not.
+- **Several model jobs, not one chat.** Extract ≠ architect catalog ≠ map aliases ≠ suggest a miss — separate contracts, separate evals.
+- **Rules and indexes first.** Exact aliases own the easy majority; models handle the long tail.
+- **Human confirm on durable writes.** Suggestions are cheap; wrong stock links are not.
+- **Budget the model.** Per-family / per-bill spend caps; stop calling once local hit rate is healthy.
+- **No secret prompts in public.** Patterns and outcomes ship; keys, prompts, and customer data do not.
 
 ---
 
 ## Stack (representative)
 
-`TypeScript` · `Next.js` · `Flutter` · `Firestore` · Vision OCR · LLM orchestration · inventory / invoice domain modeling
+`TypeScript` · `Next.js` · `Flutter` · `Firestore` · Google Vision OCR · LLM orchestration (incl. frontier models such as Grok) · catalog / inventory domain modeling
 
 ---
 
@@ -46,4 +59,4 @@ Private production systems stay private. This repo is the **public case-study la
 
 ---
 
-*Screenshots in the case studies use blurred UI / synthetic data. Figures are illustrative of architecture and outcomes, not production exports.*
+*Images are synthetic mockups. Figures illustrate architecture and clerk impact — not production exports.*

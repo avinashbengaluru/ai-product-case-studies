@@ -1,8 +1,28 @@
-# Case study 2 — Scan → invoice → stock
+# Scan → invoice → stock
 
 **Domain:** Mobile sales ops + batch/lot inventory  
 **Role:** Full-stack product (Flutter, APIs, FEFO consumption)  
 **One-liner:** Build sales invoices by scanning **individual product labels** with a phone — **no external POS**, no barcode gun, no “scan the shipping carton and hope.”
+
+---
+
+## Where AI fits (this app vs the system around it)
+
+The phone scan path is intentionally **deterministic** at the moment of sale: QR token → server lookup → draft line → FEFO on process. That speed and trust matter on the floor.
+
+AI still did heavy lifting **upstream** so the scan can be dumb and fast:
+
+| Upstream AI (from Smart Invoice Matching / catalog work) | Why the scan app needs it |
+| --- | --- |
+| LLM-built variant matrices + alias maps | Label resolves to a **real** sellable unit, not free text |
+| OCR + LLM on purchase bills → lots on the variant | FEFO has real batches/expiry to consume |
+| Match-ready billing names on variants | Invoice line language matches accounting expectations |
+
+```text
+AI catalog + purchase extract  →  labeled product units  →  phone scan (no model)  →  FEFO stock
+```
+
+So this product is **app development + AI-backed master data**, not “AI camera magic” at checkout.
 
 ---
 
@@ -24,6 +44,7 @@ A third trap looks like “scanning” but still fails ops:
 | **No external POS** | Phone app *is* the capture surface — draft invoice + process lives there |
 | **No dedicated scanner** | Built-in camera only, so every clerk can sell without extra hardware |
 | **Scan the product, not the box** | QR lives on the **unit / product stock label** that identifies the exact variant + lot path |
+| **AI-ready catalog underneath** | Scan only works if variants, aliases, and lots were built correctly (often with AI) |
 
 ![Problem: external POS vs phone-only app — no external POS](../assets/02-no-external-pos.png)
 

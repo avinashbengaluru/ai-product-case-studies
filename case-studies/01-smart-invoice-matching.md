@@ -1,8 +1,43 @@
-# Case study 1 — Smart Invoice Matching
+# Smart Invoice Matching
 
 **Domain:** B2B wholesale ops (purchase & sales invoices ↔ catalog)  
-**Role:** Product / systems design + AI resolution pipeline  
-**One-liner:** Turn messy invoice lines into matched catalog products automatically — clerks only review exceptions, not every SKU.
+**Role:** Product / AI systems design + full pipeline  
+**One-liner:** AI reads the bill, builds/extends the catalog, and matches lines to real products — clerks only review exceptions.
+
+---
+
+## AI in this product (more than “a match button”)
+
+Matching is the visible tip. Underneath, AI runs at **four** stages:
+
+```mermaid
+flowchart LR
+  A[PDF / image bill] --> B[Vision OCR]
+  B --> C[LLM structured extract]
+  C --> D[Local-first resolve]
+  D --> E{Miss / weak?}
+  E -->|no| F[MATCHED]
+  E -->|yes| G[LLM suggest / new variant]
+  G --> H[Clerk confirm]
+  F --> I[Save + stock link]
+  H --> I
+
+  J[Messy billing history + docs] --> K[LLM catalog architect]
+  K --> L[LLM string→variant mapper]
+  L --> M[Match-ready catalog]
+  M --> D
+```
+
+| Stage | AI role | Clerk role |
+| --- | --- | --- |
+| **1. Extract** | Vision OCR + LLM → structured lines (description, qty, batch, expiry, amounts) | Fix bad cells in a table |
+| **2. Catalog intelligence** | LLM designs rich variant matrices from Tally-style strings, price lists, IFUs; second step maps billing strings onto variants (avoids blind Cartesian SKUs) | Publish / correct families |
+| **3. Research assist** | Retrieve manufacturer pages/PDFs; OCR docs; LLM emits catalog specs + alias candidates | Accept or reject proposed structure |
+| **4. Resolve assist** | On weak/local misses only: LLM proposes `SUGGEST` / `NEW` with attribute guesses | One-tap confirm — never silent write |
+
+**Also in the loop:** historical clerk notes as variant signals (sizes, packs, models) when a family is thin; per-family model budgets so spend stays proportional to ambiguity.
+
+Without stages 2–3, stage 4 has nothing trustworthy to match against. The product is an **AI catalog + AI invoice pipeline**, not only a search box.
 
 ---
 
@@ -24,17 +59,17 @@ A supplier PDF or sales bill lands. For **every line**, a clerk typically:
 
 **Pain:** slow, dependent on tribal knowledge, inconsistent names, no reliable link from “what was billed” to “what we stock.”
 
-### After — “Upload → auto-match → confirm the red rows”
+### After — “AI extract → auto-match → confirm the red rows”
 
 ![Resolve table: most lines MATCHED, clerk only touches exceptions](../assets/01-after-resolve-table.png)
 
-1. Clerk uploads / pastes the bill (or OCR extract)
+1. Clerk uploads the bill — **Vision + LLM** extract structured lines
 2. System resolves each line **local-first** (exact aliases → ledger aliases → rules/fuzzy)
-3. Table lights up: green **MATCHED**, amber **SUGGEST**, red **UNMATCHED / NEW**
-4. Clerk only works the amber/red rows — accept suggestion, pick attributes, or create variant
-5. Save writes a **durable variant link** (and aliases learn from confirmed matches)
+3. Misses get an **LLM suggestion** (or new-variant path), not a blank search box
+4. Table: green **MATCHED**, amber **SUGGEST**, red **UNMATCHED / NEW**
+5. Clerk only works amber/red; save writes durable variant links (aliases learn)
 
-**Gain:** most lines never need a human search; AI/LLM only helps when local matchers fail; stock and reporting inherit stable IDs.
+**Gain:** AI does extract + catalog + long-tail suggest; clerks do judgment, not typing.
 
 ```mermaid
 flowchart LR
@@ -44,10 +79,10 @@ flowchart LR
     B3 --> B4[Next line…]
   end
   subgraph after [After]
-    A1[Extract lines] --> A2[Auto-resolve cascade]
+    A1[OCR + LLM extract] --> A2[Auto-resolve cascade]
     A2 --> A3{Confidence?}
     A3 -->|high| A4[Matched — skip]
-    A3 -->|low| A5[Clerk confirms]
+    A3 -->|low| A5[LLM suggest → clerk]
     A4 --> A6[Save + stock link]
     A5 --> A6
   end
@@ -59,11 +94,11 @@ flowchart LR
 
 | | Before | After |
 | --- | --- | --- |
-| **What clerk sees** | `ORMCO ORTHO SOLO PRIM 10CC` on a PDF | Same string in a resolve table |
-| **What clerk does** | Search “ortho”, “solo”, “primer”… pick from memory | Status already **MATCHED** → Orthodontic Primer 10cc |
-| **If unknown pack** | Guess or leave as free text | **SUGGEST** with size/pack dropdowns; one tap to confirm |
+| **What clerk sees** | `ORMCO ORTHO SOLO PRIM 10CC` on a PDF | Extracted row + resolve status |
+| **What clerk does** | Search “ortho”, “solo”, “primer”… pick from memory | Often already **MATCHED**; else tap **SUGGEST** |
+| **If unknown pack** | Guess or leave as free text | LLM/attribute dropdowns → confirm |
 | **What gets saved** | Ambiguous description | Variant ID + billing name + notes |
-| **Next time same string** | Search again | Instant exact/alias hit — no model call |
+| **Next time same string** | Search again | Instant exact/alias — **no model call** |
 
 ---
 
@@ -74,14 +109,14 @@ Incoming invoice lines rarely match clean catalog SKUs 1:1. Pack sizes, shorthan
 Failure modes we designed against:
 
 - Sending **every** line to an LLM when aliases already know the answer
-- Treating “shares a generic ledger” as unfinished when many→one matching is valid
+- Using AI only at match-time while the catalog itself stays hand-built and incomplete
 - Pretty catalog cards that still don’t **match from a real invoice line**
 
 ---
 
 ## Approach
 
-### Local-first cascade, LLM as opt-in assist
+### Local-first cascade, LLM as measured assist
 
 ```mermaid
 flowchart TD
@@ -97,16 +132,16 @@ flowchart TD
   F --> G
   G --> H[Durable variant link]
   M --> H
-  E -. optional .-> L[LLM candidate pack]
-  F -. optional .-> L
+  E --> L[LLM candidate pack]
+  F --> L
   L --> G
 ```
 
 **Design choices**
 
-1. **Store match aliases on the variant** — durable billing strings, not one-off prompt memory
-2. **Already-matched lines never call the model**
-3. **Ops status vocabulary** — MATCHED / SUGGEST / UNMATCHED / NEW so the UI is an exception queue
+1. **Multi-model jobs** — extract, catalog architect, string mapper, and miss-suggest are separate contracts
+2. **Store match aliases on the variant** — durable billing strings, not one-off prompt memory
+3. **Already-matched lines never call the model**
 4. **Coverage tiers** keep the team honest about what’s actually match-ready
 
 | Tier | Meaning |
@@ -123,10 +158,11 @@ flowchart TD
 
 | Metric | Before (typical) | After (target shape) |
 | --- | --- | --- |
+| Bill intake | Retype from PDF | OCR + LLM extract → edit table |
 | Clerk time per bill | Hunt every line | Touch ~10–20% exception rows |
-| Resolve mix | 100% human judgment | ~70%+ exact/alias, rest rules + rare LLM suggest |
-| Repeat of same string | Search again | Instant match |
-| Downstream stock link | Often missing / wrong | Default on save |
+| Resolve mix | 100% human judgment | ~70%+ exact/alias; rules + LLM on the tail |
+| Catalog growth | Manual SKU invention | AI architect + mapper + human publish |
+| Repeat of same string | Search again | Instant match, $0 model |
 
 ```mermaid
 pie title Illustrative resolve mix after Smart Invoice Matching (synthetic)
@@ -143,9 +179,10 @@ pie title Illustrative resolve mix after Smart Invoice Matching (synthetic)
 - Offline eval sets of anonymized billing strings with gold variant IDs
 - Per-family “stop calling the model” once local hit rate clears a threshold
 - Stronger pack÷N / buy-vs-sell guards as first-class resolve reasons
+- Public-safe demos of extract vs architect vs mapper as three small replay fixtures
 
 ---
 
 ## Image notes
 
-Synthetic mockups for the public portfolio (fake product names, demo coverage %). They show the clerk before/after for **Smart Invoice Matching** — not production screenshots.
+Synthetic mockups for the public portfolio (fake product names, demo coverage %). They show clerk before/after for **Smart Invoice Matching** — not production screenshots.
