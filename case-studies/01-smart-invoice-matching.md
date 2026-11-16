@@ -1,188 +1,95 @@
-# Smart Invoice Matching
+# Case Study 01: BillMiner Dual-Reader Invoice Scanner, Gemma 4 Matching & Self-Learning Catalogue
 
-**Domain:** B2B wholesale ops (purchase & sales invoices ↔ catalog)  
-**Role:** Product / AI systems design + full pipeline  
-**One-liner:** AI reads the bill, builds/extends the catalog, and matches lines to real products — clerks only review exceptions.
+**Product:** **BillMiner** (XML-to-LLM operations platform for a dental-supplies distributor on Tally Prime)  
+**Role:** Founder / Lead AI & Systems Engineer  
+**One-liner:** Dual-reader OCR reconciled by arithmetic checks, open-weight **Gemma 4** item matching (**92% / 291 of 317 real supplier bills**), and a nightly self-learning loop that updates aliases and catalogue cards with reversible audit logs.
 
 ---
 
-## AI in this product (more than “a match button”)
+## 1. The Real-World Problem: Tally XML + Messy Multi-Page Supplier Bills
 
-Matching is the visible tip. Underneath, AI runs at **four** stages:
+A dental-supplies distributor ran its entire business on **Tally Prime** (`XML over HTTP :9000`). Over years of manual entry by billing clerks, the item master had grown to **~13,000 stock-item names** (~9,600 sold and **3,256 never-billed dead names**) filled with typos, duplicates, and three different names for the same SKU.
+
+Meanwhile, multi-page supplier purchase bills arrived as skewed photos or complex PDFs with:
+- Tilted tables and scattered columns
+- European/mixed number formatting (`1.234,56`)
+- Quantity and rate printed in swapped columns
+- Product names wrapping onto the next row
+- Pack-size quirks specific to individual suppliers (e.g., *"this supplier prints a pack of 5 as 1"*)
+
+---
+
+## 2. Architecture: Dual Readers + Open-Weight Gemma 4 + Nightly Agent Loop
 
 ```mermaid
 flowchart LR
-  A[PDF / image bill] --> B[Vision OCR]
-  B --> C[LLM structured extract]
-  C --> D[Local-first resolve]
-  D --> E{Miss / weak?}
-  E -->|no| F[MATCHED]
-  E -->|yes| G[LLM suggest / new variant]
-  G --> H[Clerk confirm]
-  F --> I[Save + stock link]
-  H --> I
-
-  J[Messy billing history + docs] --> K[LLM catalog architect]
-  K --> L[LLM string→variant mapper]
-  L --> M[Match-ready catalog]
-  M --> D
+  A[Multi-page PDF / photo bill] --> B1[Reader 1: Vision OCR + custom rule-based table layout engine]
+  A --> B2[Reader 2: LlamaParse 'OCRia-1']
+  B1 --> C{Arithmetic Check: Do lines sum to printed taxable total?}
+  B2 --> C
+  C -->|Winning reader + supplier notes| D[Gemma 4: Match to Tally item + Catalogue Card]
+  D --> E[Finance & GST / HSN / GSTIN / Box-vs-Loose checks]
+  E --> F[Post to Tally as Paisa-Exact XML Voucher]
+  F --> G[Nightly Cloudflare Cron: Diff scan vs posted voucher → learn aliases]
+  G --> H[Claude Cloud Agent: Audit bill & fix catalogue cards with Undo Log]
 ```
 
-| Stage | AI role | Clerk role |
+| Stage | What BillMiner Runs | Why It Works in Production |
 | --- | --- | --- |
-| **1. Extract** | Vision OCR + LLM → structured lines (description, qty, batch, expiry, amounts) | Fix bad cells in a table |
-| **2. Catalog intelligence** | LLM designs rich variant matrices from Tally-style strings, price lists, IFUs; second step maps billing strings onto variants (avoids blind Cartesian SKUs) | Publish / correct families |
-| **3. Research assist** | Retrieve manufacturer pages/PDFs; OCR docs; LLM emits catalog specs + alias candidates | Accept or reject proposed structure |
-| **4. Resolve assist** | On weak/local misses only: LLM proposes `SUGGEST` / `NEW` with attribute guesses | One-tap confirm — never silent write |
-
-**Also in the loop:** historical clerk notes as variant signals (sizes, packs, models) when a family is thin; per-family model budgets so spend stays proportional to ambiguity.
-
-Without stages 2–3, stage 4 has nothing trustworthy to match against. The product is an **AI catalog + AI invoice pipeline**, not only a search box.
+| **1. Parallel Dual Readers** | **Reader 1:** Google Vision OCR + custom rule-based table/column parser (tilted tables, swapped qty/rate, wrapped lines).<br>**Reader 2:** LlamaParse (`OCRia-1`). | **Checks decide the winner:** Each reader's extracted lines must sum to the bill's printed taxable total. When the two disagree, the one whose math checks out wins. |
+| **2. Per-Supplier Memory** | Applies remembered notes per supplier (e.g., pack-of-5 billed as 1). | Arithmetic is re-checked after applying notes so a stale or bad note can never corrupt a bill. |
+| **3. Open-Weight Gemma 4 Matching** | Replaced expensive commercial LLM APIs with **Gemma 4** in production to match each bill line to *both* its Tally stock item and its structured catalogue card (variant). | Cuts per-bill inference cost and eliminates rate limits while keeping clerks unblocked (unknown lines get a temporary name and build catalogue cards in the background). |
+| **4. Pre-Post Finance & Tax Gate** | Verifies line totals, GST slabs, HSN-code mismatches between the bill and Tally, supplier GSTIN, and box-vs-loose carton conversions. | Calculates per-line GST rounded half-up to the paisa before summing — matching Tally's exact tax math so Tally never rejects an XML voucher. |
+| **5. Nightly Self-Learning & Claude Audit Agent** | Every evening, a **Cloudflare cron** diffs the raw scan against what was finally posted in Tally to learn aliases and supplier rules. Then a scheduled **Claude agent** reviews the bill and fixes catalogue cards. | Fragment guards block learning from broken text snippets, and every agent edit goes through **audited endpoints** with full before/after state and 1-click undo. |
 
 ---
 
-## Before → After (clerk day)
+## 3. Before → After (Clerk & Operations Impact)
 
 ![Before: hunt every line · After: auto-match with exception review](../assets/01-before-after-matching.png)
 
-### Before — “Type, search, hope”
+### Before — Manual Tally Entry ("Type, search, hope")
 
 ![Clerk manually searching the catalog for each invoice line](../assets/01-before-manual-search.png)
 
-A supplier PDF or sales bill lands. For **every line**, a clerk typically:
+1. Clerk reads a multi-page supplier bill with 20–80 lines of shorthand and pack codes.
+2. Searches ~13,000 messy Tally names by memory; picks a duplicate or invents a new free-text name.
+3. Skips batch/expiry or miscalculates box-vs-loose quantities.
+4. Rounding differences between supplier bills and Tally GST slabs stall voucher entry.
 
-1. Reads a messy billing string (“Brand X primer 10ml”, OCR garbage, pack shorthand)
-2. Opens the catalog / stock list and **searches by memory**
-3. Picks something that *looks* right — or invents a free-text description
-4. Moves on; wrong size / pack / variant only shows up later in stock or customer complaints
-5. Repeats for 20–80 lines per bill
-
-**Pain:** slow, dependent on tribal knowledge, inconsistent names, no reliable link from “what was billed” to “what we stock.”
-
-### After — “AI extract → auto-match → confirm the red rows”
+### After — Dual-Reader Extract → Gemma 4 Match → Nightly Learning
 
 ![Resolve table: most lines MATCHED, clerk only touches exceptions](../assets/01-after-resolve-table.png)
 
-1. Clerk uploads the bill — **Vision + LLM** extract structured lines
-2. System resolves each line **local-first** (exact aliases → ledger aliases → rules/fuzzy)
-3. Misses get an **LLM suggestion** (or new-variant path), not a blank search box
-4. Table: green **MATCHED**, amber **SUGGEST**, red **UNMATCHED / NEW**
-5. Clerk only works amber/red; save writes durable variant links (aliases learn)
-
-**Gain:** AI does extract + catalog + long-tail suggest; clerks do judgment, not typing.
-
-```mermaid
-flowchart LR
-  subgraph before [Before]
-    B1[Read line] --> B2[Manual search]
-    B2 --> B3[Guess / free-text]
-    B3 --> B4[Next line…]
-  end
-  subgraph after [After]
-    A1[OCR + LLM extract] --> A2[Auto-resolve cascade]
-    A2 --> A3{Confidence?}
-    A3 -->|high| A4[Matched — skip]
-    A3 -->|low| A5[LLM suggest → clerk]
-    A4 --> A6[Save + stock link]
-    A5 --> A6
-  end
-```
+1. Upload photo or multi-page PDF — **Vision Layout Reader + LlamaParse** extract lines and verify against the printed taxable total.
+2. **Gemma 4** + local alias tables match each line to its Tally item and catalogue variant.
+3. Lines with no Tally name receive a temporary name so the clerk is **never blocked**; catalogue cards build asynchronously.
+4. **Process** posts the purchase voucher to Tally via the Windows desktop agent as paisa-exact XML.
+5. That night, the **Cloudflare cron** and **Claude catalogue agent** learn from any clerk edits so the same string resolves at $0 model cost next time.
 
 ---
 
-## Concrete before / after on one line (synthetic)
+## 4. Rebuilding a ~13,000-Item Catalogue Under the "Nothing Is Lost" Rule
 
-| | Before | After |
-| --- | --- | --- |
-| **What clerk sees** | `ORMCO ORTHO SOLO PRIM 10CC` on a PDF | Extracted row + resolve status |
-| **What clerk does** | Search “ortho”, “solo”, “primer”… pick from memory | Often already **MATCHED**; else tap **SUGGEST** |
-| **If unknown pack** | Guess or leave as free text | LLM/attribute dropdowns → confirm |
-| **What gets saved** | Ambiguous description | Variant ID + billing name + notes |
-| **Next time same string** | Search again | Instant exact/alias — **no model call** |
+Without a clean catalogue, invoice matching has nothing reliable to land on. We restructured **~13,000 Tally item names** (~9,600 sold) into **Product Families → Variants (Catalogue Cards)**:
 
----
+- **Rule 1 — Nothing from Tally is ever lost:** Every Tally name stays findable. Every catalogue change is a *move*, never a delete, verified against the full set of Tally names before and after each batch.
+- **Rule 2 — Dead names isolated on our side:** **3,256 never-billed Tally names** were audited and marked in our database without touching the accountants' Tally ledger.
+- **Rule 3 — Multi-source research + Staff Micro-Questions:**
+  - Manufacturer catalogues serve as ground truth.
+  - A **Brave Search + LLM web research agent** cross-checks missing attributes across multiple web sources.
+  - Questions requiring physical shelf knowledge become quick **1-tap mobile questions** for staff — settling **~22% of catalogue gaps**.
 
-## Problem (why this mattered)
-
-Incoming invoice lines rarely match clean catalog SKUs 1:1. Pack sizes, shorthand, brand aliases, and OCR noise break stock, pricing, and sold metrics unless every line lands on a **real variant**.
-
-Failure modes we designed against:
-
-- Sending **every** line to an LLM when aliases already know the answer
-- Using AI only at match-time while the catalog itself stays hand-built and incomplete
-- Pretty catalog cards that still don’t **match from a real invoice line**
+![Catalog match coverage by tier](../assets/01-audit-tiers.png)
 
 ---
 
-## Approach
+## 5. Measured Production Results
 
-### Local-first cascade, LLM as measured assist
-
-```mermaid
-flowchart TD
-  A[Invoice / billing line] --> B{Exact alias / assigned string?}
-  B -->|yes| M[MATCHED]
-  B -->|no| C{Stock ledger alias?}
-  C -->|yes| M
-  C -->|no| D{Model / pack / fuzzy rules?}
-  D -->|confident| M
-  D -->|weak| E[SUGGEST_VARIANT]
-  D -->|none| F[UNMATCHED / NEW_ITEM]
-  E --> G[Clerk confirm]
-  F --> G
-  G --> H[Durable variant link]
-  M --> H
-  E --> L[LLM candidate pack]
-  F --> L
-  L --> G
-```
-
-**Design choices**
-
-1. **Multi-model jobs** — extract, catalog architect, string mapper, and miss-suggest are separate contracts
-2. **Store match aliases on the variant** — durable billing strings, not one-off prompt memory
-3. **Already-matched lines never call the model**
-4. **Coverage tiers** keep the team honest about what’s actually match-ready
-
-| Tier | Meaning |
+| Metric | Measured Result |
 | --- | --- |
-| Match-ready | ≥1 billing string resolves to a real stock ledger name or alias |
-| Alias-only | Strings present but none hit live stock items |
-| Unmatched catalog | No assigned billing strings yet |
-
-![Catalog match coverage by tier — synthetic demo](../assets/01-audit-tiers.png)
-
----
-
-## Impact (illustrative / synthetic)
-
-| Metric | Before (typical) | After (target shape) |
-| --- | --- | --- |
-| Bill intake | Retype from PDF | OCR + LLM extract → edit table |
-| Clerk time per bill | Hunt every line | Touch ~10–20% exception rows |
-| Resolve mix | 100% human judgment | ~70%+ exact/alias; rules + LLM on the tail |
-| Catalog growth | Manual SKU invention | AI architect + mapper + human publish |
-| Repeat of same string | Search again | Instant match, $0 model |
-
-```mermaid
-pie title Illustrative resolve mix after Smart Invoice Matching (synthetic)
-  "Exact / alias — no clerk work" : 72
-  "Rules / fuzzy — auto" : 14
-  "LLM-assisted suggest — clerk taps" : 9
-  "Unmatched / new — clerk creates" : 5
-```
-
----
-
-## What I’d improve next
-
-- Offline eval sets of anonymized billing strings with gold variant IDs
-- Per-family “stop calling the model” once local hit rate clears a threshold
-- Stronger pack÷N / buy-vs-sell guards as first-class resolve reasons
-- Public-safe demos of extract vs architect vs mapper as three small replay fixtures
-
----
-
-## Image notes
-
-Synthetic mockups for the public portfolio (fake product names, demo coverage %). They show clerk before/after for **Smart Invoice Matching** — not production screenshots.
+| **End-to-End Purchase Bill Accuracy** | **92% (291 of 317 real supplier bills)** read and matched correctly end-to-end |
+| **Posted Voucher Regression Check** | **12 of 12 posted bills** matched posted totals and line counts to the paisa |
+| **Catalogue Reconstruction Scope** | **~13,000 Tally names** (~9,600 sold; **3,256 dead names** audited; **0 lost keys**) |
+| **Catalogue Gaps Solved by Staff UI** | **~22%** resolved via mobile staff micro-questions |
+| **Production Matching Model** | Migrated from commercial LLM API to open-weight **Gemma 4** |
