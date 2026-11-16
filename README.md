@@ -47,8 +47,8 @@ I built **BillMiner** to turn **Tally Prime (a desktop Legacy ERP and book keepi
 | --- | --- |
 | **Open-Weight & Cloud AI / OCR** | **Gemma 4** (production matching), **Gemma 2B LoRA** (fine-tuning judge), **Claude Agents** (scheduled audited cloud routines), **Google Cloud Vision**, **LlamaParse ("OCRia-1")**, **Brave Search API** |
 | **Edge & Data Layer** | **Cloudflare Workers** (bill reader, seller detect, quoting, nightly learning cron), **Cloudflare D1 (SQLite)**, **Cloudflare KV**, **Cloud Firestore**, **Firebase Storage** |
-| **Legacy ERP System** | **Tally Prime** (`XML over HTTP :9000`, custom **TDL** reports ≤500 KB/job, Windows desktop sync & 4×6 label agent) |
-| **Web App & Integrations** | **Next.js / React / TypeScript**, **Tailwind CSS**, **shadcn/ui**, **Firebase App Hosting & Auth**, Gmail read-only draft worker, WhatsApp intake, thermal label printer |
+| **Legacy ERP & Book Keeping** | **Tally Prime Legacy ERP** (`XML over HTTP :9000`, custom **TDL** reports ≤500 KB/job, bidirectional XML voucher sync agent) |
+| **Web App & Agent Surfaces** | **Next.js / React / TypeScript**, **Tailwind CSS**, **shadcn/ui**, **Firebase App Hosting & Auth**, **Rao** in-screen invoicing agent, Gmail read-only draft agent, WhatsApp intake |
 
 ---
 
