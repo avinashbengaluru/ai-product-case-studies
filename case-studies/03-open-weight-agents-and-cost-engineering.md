@@ -1,7 +1,7 @@
 # Case Study 03: Open-Weight LLMs (Gemma 4 & LoRA), Autonomous Agents & Radical Cost Engineering
 
-**Product:** **BillMiner** (XML-to-LLM operations platform on top of Tally Prime)  
-**Role:** Founder / AI Systems & Agent Architect  
+**Project:** **BillMiner** (XML-to-LLM operations & automated book keeping system built on top of Tally Prime, a desktop Legacy ERP)  
+**Role:** AI Systems & Agent Engineer  
 **One-liner:** How I replaced expensive commercial LLM APIs with **open-weight Gemma 4**, built a **Gemma 2B LoRA** ranking judge, offloaded lookups to **~25 ms edge databases**, and engineered **4 bounded AI agents** with arithmetic and reversible audit guardrails.
 
 ---

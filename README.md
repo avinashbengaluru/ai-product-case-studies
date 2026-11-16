@@ -1,10 +1,10 @@
 # Avinash Immaneni (`avinashbengaluru`)
 
-**AI Systems & Agent Architect · Open-Weight LLM Engineer · Founder of BillMiner**
+**AI Agent & Data Systems Engineer · Open-Weight LLM Pipelines · Senior Data Scientist**
 
-I ship full-stack production systems where AI is not a demo chat wrapper — it runs through **autonomous, tool-using agents, open-weight models (`Gemma 4` & `Gemma 2B LoRA`), dual-reader OCR pipelines, edge database routing (`~25 ms/line`), and reversible audit queues**.
+I build full-stack systems where AI is not a demo chat wrapper — it runs through **autonomous, tool-using agents, open-weight models (`Gemma 4` & `Gemma 2B LoRA`), dual-reader OCR pipelines, edge database routing (`~25 ms/line`), and reversible audit queues**.
 
-My flagship platform, **BillMiner**, turns a legacy **Tally Prime** desktop **book keeping and accounting system** (`XML over HTTP :9000`) into an LLM-run distribution and automated book keeping system across ~13,000 messy stock items — without changing how bookkeepers and accountants work in Tally.
+I built **BillMiner** to turn **Tally Prime (a desktop Legacy ERP and book keeping system** communicating via `XML over HTTP :9000`) into an LLM-powered distribution and automated book keeping workflow across ~13,000 messy stock items — without changing how bookkeepers and accountants work in Tally.
 
 > **Core Theme:** *XML in, intelligence out.* Spend model budget only on ambiguity: offload known lookups to ~25 ms edge databases at $0 token cost, replace expensive frontier APIs with open-weight models (`Gemma 4` + `Gemma 2B LoRA`), and let deterministic arithmetic checks decide when models disagree.
 

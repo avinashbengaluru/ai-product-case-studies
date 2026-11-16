@@ -1,7 +1,7 @@
 # Case Study 02: Edge Seller Detect (~25 ms/line), "Rao" Invoicing Agent & Mobile Unit Scan
 
-**Product:** **BillMiner** (XML-to-LLM operations platform on top of Tally Prime)  
-**Role:** Founder / Lead AI & Full-Stack Engineer  
+**Project:** **BillMiner** (XML-to-LLM operations & automated book keeping system built on top of Tally Prime, a desktop Legacy ERP)  
+**Role:** Lead AI & Full-Stack Engineer  
 **One-liner:** Turn customer WhatsApp messages, Gmail enquiries, handwritten lists, and mobile unit-label scans into exact Tally invoice lines in **~25 ms/line at the edge**, backed by **Rao (Retrieval Augmented Outvoicing)** and a fine-tuned **Gemma 2B LoRA** candidate judge.
 
 ---

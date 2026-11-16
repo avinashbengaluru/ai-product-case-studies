@@ -1,7 +1,7 @@
 # Case Study 01: BillMiner Dual-Reader Invoice Scanner, Gemma 4 Matching & Self-Learning Catalogue
 
-**Product:** **BillMiner** (XML-to-LLM operations platform for a dental-supplies distributor on Tally Prime)  
-**Role:** Founder / Lead AI & Systems Engineer  
+**Project:** **BillMiner** (XML-to-LLM operations & automated book keeping system built on top of Tally Prime, a desktop Legacy ERP)  
+**Role:** Lead AI & Systems Engineer  
 **One-liner:** Dual-reader OCR reconciled by arithmetic checks, open-weight **Gemma 4** item matching (**92% / 291 of 317 real supplier bills**), and a nightly self-learning loop that updates aliases and catalogue cards with reversible audit logs.
 
 ---
